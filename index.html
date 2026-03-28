@@ -3,20 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>URBAN SURFER | Clear UI Edition</title>
+    <title>URBAN SURFER | Mobile Ready</title>
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@900&display=swap" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <style>
-        body { margin: 0; overflow: hidden; background: #87CEEB; font-family: 'Orbitron', sans-serif; user-select: none; }
+        body { margin: 0; overflow: hidden; background: #87CEEB; font-family: 'Orbitron', sans-serif; user-select: none; touch-action: none; }
         #ui { position: absolute; inset: 0; pointer-events: none; color: white; text-shadow: 2px 2px 4px #000; }
         .screen { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; 
                   align-items: center; background: rgba(0,0,0,0.7); pointer-events: auto; backdrop-filter: blur(5px); }
         .btn { padding: 15px 50px; font-size: 1.5rem; background: #ffcc00; color: #000; border: none; 
-               cursor: pointer; font-family: 'Orbitron'; font-weight: 900; border-radius: 5px; text-transform: uppercase; transition: transform 0.1s; }
-        .btn:active { transform: scale(0.95); }
-        #hud { position: absolute; top: 20px; width: 100%; display: flex; justify-content: space-around; font-size: 1.5rem; }
-        #powerup-bar { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); font-size: 1.5rem; color: #fff; display: none; }
-        #warning { position: absolute; top: 20%; width: 100%; text-align: center; color: #ff0055; display: none; font-size: 2rem; animation: blink 0.2s infinite; }
+               cursor: pointer; font-family: 'Orbitron'; font-weight: 900; border-radius: 5px; text-transform: uppercase; }
+        #hud { position: absolute; top: 20px; width: 100%; display: flex; justify-content: space-around; font-size: 1.2rem; }
+        #powerup-bar { position: absolute; bottom: 80px; left: 50%; transform: translateX(-50%); font-size: 1.2rem; color: #fff; display: none; background: rgba(0,0,0,0.5); padding: 5px 15px; border-radius: 20px; }
+        #warning { position: absolute; top: 20%; width: 100%; text-align: center; color: #ff0055; display: none; font-size: 1.5rem; animation: blink 0.2s infinite; }
         @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0; } 100% { opacity: 1; } }
         .hidden { display: none !important; }
     </style>
@@ -25,8 +24,8 @@
 
     <div id="ui">
         <div id="menu" class="screen">
-            <h1 style="font-size: 4rem; margin-bottom: 10px; color: #fff;">URBAN SURFER</h1>
-            <p>ARROWS: Move | UP: Jump | DOWN: Slide</p>
+            <h1 style="font-size: 3rem; margin-bottom: 10px; color: #fff; text-align: center;">URBAN SURFER</h1>
+            <p style="text-align: center; padding: 0 20px;">SWIPE or ARROWS to Move/Jump/Slide</p>
             <button class="btn" onclick="startGame()">START RUN</button>
         </div>
 
@@ -39,25 +38,18 @@
         <div id="powerup-bar">POWERUP ACTIVE</div>
 
         <div id="over" class="screen hidden">
-            <h1 style="color: #ff0055; font-size: 4rem;">CAUGHT!</h1>
-            <p style="font-size: 1.5rem;">FINAL SCORE: <span id="f-score">0</span></p>
+            <h1 style="color: #ff0055; font-size: 3rem;">CAUGHT!</h1>
+            <p>FINAL SCORE: <span id="f-score">0</span></p>
             <button class="btn" onclick="location.reload()">TRY AGAIN</button>
         </div>
     </div>
 
     <script>
-        /** STATE & CONFIG **/
         const LANES = [-4, 0, 4];
         let lane = 1, active = false, score = 0, coins = 0, speed = 1.0;
-        let stumbled = false, sTimer = 0;
-        
-        // Powerups
-        let magnetTimer = 0;
-        let hoverTimer = 0;
-        let isSliding = false;
-        let slideTimer = 0;
+        let stumbled = false, sTimer = 0, magnetTimer = 0, hoverTimer = 0;
+        let isSliding = false, slideTimer = 0;
 
-        /** THREE.JS SETUP **/
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x66B2FF); 
         scene.fog = new THREE.Fog(0x66B2FF, 30, 180);
@@ -74,101 +66,50 @@
         scene.add(sun);
         scene.add(new THREE.AmbientLight(0xffffff, 0.6));
 
-        /** DYNAMIC ICON GENERATOR (Canvas to Texture) **/
         function createIconTexture(emoji, bgColor) {
             const canvas = document.createElement('canvas');
             canvas.width = 128; canvas.height = 128;
             const ctx = canvas.getContext('2d');
-            
-            // Draw colored circle background
-            ctx.fillStyle = bgColor;
-            ctx.beginPath();
-            ctx.arc(64, 64, 60, 0, Math.PI * 2);
-            ctx.fill();
-            
-            // Draw white border
-            ctx.strokeStyle = '#ffffff';
-            ctx.lineWidth = 6;
-            ctx.stroke();
-
-            // Draw Emoji
-            ctx.font = '70px Arial';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(emoji, 64, 72); // Offset Y slightly for emojis
-
+            ctx.fillStyle = bgColor; ctx.beginPath(); ctx.arc(64, 64, 60, 0, Math.PI * 2); ctx.fill();
+            ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 6; ctx.stroke();
+            ctx.font = '70px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(emoji, 64, 72);
             return new THREE.CanvasTexture(canvas);
         }
 
-        const magnetTex = createIconTexture('🧲', '#ff00ff'); // Magenta background
-        const hoverTex = createIconTexture('🚀', '#00cccc'); // Cyan background
+        const magnetTex = createIconTexture('🧲', '#ff00ff');
+        const hoverTex = createIconTexture('🚀', '#00cccc');
 
-        /** PLAYER: THE BLACK TECH-BOT **/
         const player = new THREE.Group();
         const pMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.2 }); 
-        const accentMat = new THREE.MeshStandardMaterial({ color: 0x00ffff, emissive: 0x00ffff, emissiveIntensity: 0.5 });
-        
         const torso = new THREE.Mesh(new THREE.BoxGeometry(0.8, 1.2, 0.5), pMat);
         torso.position.y = 1.6;
         const head = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.4, 0.4), pMat);
         head.position.y = 2.5;
-        const visor = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.1, 0.45), accentMat);
-        visor.position.y = 2.5; visor.position.z = 0.05;
-        
         const lLeg = new THREE.Mesh(new THREE.BoxGeometry(0.25, 1, 0.25), pMat);
         lLeg.position.set(-0.25, 0.8, 0);
         const rLeg = new THREE.Mesh(new THREE.BoxGeometry(0.25, 1, 0.25), pMat);
         rLeg.position.set(0.25, 0.8, 0);
-        
-        const lArm = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.8, 0.2), pMat);
-        lArm.position.set(-0.55, 1.6, 0);
-        const rArm = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.8, 0.2), pMat);
-        rArm.position.set(0.55, 1.6, 0);
-
-        player.add(torso, head, visor, lLeg, rLeg, lArm, rArm);
+        player.add(torso, head, lLeg, rLeg);
         scene.add(player);
 
-        /** THE COP (Enforcer) **/
         const cop = new THREE.Group();
         const cBody = new THREE.Mesh(new THREE.BoxGeometry(1.2, 2, 0.8), new THREE.MeshStandardMaterial({color: 0x111144}));
         cBody.position.y = 1.5;
-        const siren = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.2, 0.6), new THREE.MeshBasicMaterial({color: 0xff0000}));
-        siren.position.y = 2.6;
-        cop.add(cBody, siren);
+        cop.add(cBody);
         cop.position.set(0, 0, 25);
         scene.add(cop);
 
-        /** ENVIRONMENT **/
         const track = new THREE.Mesh(new THREE.PlaneGeometry(14, 2000), new THREE.MeshStandardMaterial({color: 0x333333}));
         track.rotation.x = -Math.PI/2; scene.add(track);
 
-        // City Buildings
-        for(let i=0; i<40; i++) {
-            let h = 15 + Math.random()*30;
-            let b = new THREE.Mesh(new THREE.BoxGeometry(10, h, 10), new THREE.MeshStandardMaterial({color: 0x555555}));
-            b.position.set(i % 2 === 0 ? -14 : 14, h/2, -i*20);
-            scene.add(b);
-        }
-
-        /** POOLING: OBSTACLES, COINS, POWERUPS **/
         const trains = [], barriers = [], coinsArr = [], powerups = [];
         const trainGeo = new THREE.BoxGeometry(3.5, 3.5, 12);
-        const trainMat = new THREE.MeshStandardMaterial({color: 0x999999, roughness: 0.3});
-        const barrierGeo = new THREE.BoxGeometry(3.5, 1.5, 0.5); 
-        const archGeo = new THREE.BoxGeometry(3.5, 0.5, 0.5);   
+        const trainMat = new THREE.MeshStandardMaterial({color: 0x999999});
         
         for(let i=0; i<4; i++) { 
             let t = new THREE.Mesh(trainGeo, trainMat);
             t.position.set(LANES[Math.floor(Math.random()*3)], 1.75, -80 - (i * 60));
             scene.add(t); trains.push(t);
-        }
-
-        for(let i=0; i<6; i++) { 
-            let isSlide = Math.random() > 0.5;
-            let b = new THREE.Mesh(isSlide ? archGeo : barrierGeo, new THREE.MeshStandardMaterial({color: 0xff4400}));
-            b.position.set(LANES[Math.floor(Math.random()*3)], isSlide ? 2.5 : 0.75, -40 - (i * 30));
-            b.isSlide = isSlide;
-            scene.add(b); barriers.push(b);
         }
 
         for(let i=0; i<15; i++) { 
@@ -177,59 +118,60 @@
             scene.add(c); coinsArr.push(c);
         }
 
-        // Power-ups (Using SPRITES instead of blocks)
         for(let i=0; i<2; i++) {
             let type = i; 
             let pMat = new THREE.SpriteMaterial({ map: type === 0 ? magnetTex : hoverTex });
-            let p = new THREE.Sprite(pMat);
-            p.scale.set(2, 2, 1); // Make it large and visible
+            let p = new THREE.Sprite(pMat); p.scale.set(2, 2, 1);
             p.position.set(LANES[Math.floor(Math.random()*3)], 1.5, -100 - (i*150));
-            p.pType = type;
-            scene.add(p); powerups.push(p);
+            p.pType = type; scene.add(p); powerups.push(p);
         }
 
-        /** CONTROLS **/
+        /** INPUTS (KEYBOARD + TOUCH SWIPE) **/
         let vVel = 0;
+        let touchStartX = 0, touchStartY = 0;
+
         window.addEventListener('keydown', e => {
             if(!active) return;
-            if(e.key === "ArrowLeft" || e.key === "a") lane = Math.max(0, lane-1);
-            if(e.key === "ArrowRight" || e.key === "d") lane = Math.min(2, lane+1);
-            
-            // Jump
-            if((e.key === "ArrowUp" || e.key === "w" || e.key === " ") && player.position.y <= (hoverTimer > 0 ? 5.1 : 0.1) && !isSliding) {
-                vVel = 0.4;
-            }
-            
-            // Slide
-            if((e.key === "ArrowDown" || e.key === "s") && player.position.y < 0.2) {
-                isSliding = true;
-                slideTimer = 30; 
+            if(e.key === "ArrowLeft") moveLeft();
+            if(e.key === "ArrowRight") moveRight();
+            if(e.key === "ArrowUp") jump();
+            if(e.key === "ArrowDown") slide();
+        });
+
+        window.addEventListener('touchstart', e => {
+            touchStartX = e.touches[0].clientX;
+            touchStartY = e.touches[0].clientY;
+        });
+
+        window.addEventListener('touchend', e => {
+            if(!active) return;
+            let dx = e.changedTouches[0].clientX - touchStartX;
+            let dy = e.changedTouches[0].clientY - touchStartY;
+            if(Math.abs(dx) > Math.abs(dy)) {
+                if(dx > 30) moveRight(); else if(dx < -30) moveLeft();
+            } else {
+                if(dy < -30) jump(); else if(dy > 30) slide();
             }
         });
 
-        /** MAIN GAME LOOP **/
+        function moveLeft() { lane = Math.max(0, lane-1); }
+        function moveRight() { lane = Math.min(2, lane+1); }
+        function jump() { if(player.position.y <= (hoverTimer > 0 ? 5.1 : 0.1) && !isSliding) vVel = 0.4; }
+        function slide() { if(player.position.y < 0.2) { isSliding = true; slideTimer = 30; } }
+
         function update() {
             if(!active) return;
             speed += 0.0001; score++;
             let d = Date.now();
             
-            // 1. Player Animations
             if(isSliding) {
                 slideTimer--;
-                torso.rotation.x = Math.PI / 2;
-                torso.position.y = 0.5;
-                head.position.y = 0.8;
-                visor.position.y = 0.8;
-                lLeg.rotation.x = -Math.PI/2; rLeg.rotation.x = -Math.PI/2;
-                lArm.rotation.x = 0; rArm.rotation.x = 0;
+                torso.rotation.x = Math.PI / 2; torso.position.y = 0.5;
                 if(slideTimer <= 0) isSliding = false;
             } else {
                 torso.rotation.x = 0.1; torso.position.y = 1.6;
-                head.position.y = 2.5; visor.position.y = 2.5;
                 lLeg.rotation.x = Math.sin(d * 0.015) * 0.8;
                 rLeg.rotation.x = -Math.sin(d * 0.015) * 0.8;
-                lArm.rotation.x = -Math.sin(d * 0.015) * 0.8;
-                rArm.rotation.x = Math.sin(d * 0.015) * 0.8;
             }
             
             player.position.x = THREE.MathUtils.lerp(player.position.x, LANES[lane], 0.2);
@@ -238,28 +180,13 @@
             if(player.position.y > floorLevel) vVel -= 0.022; 
             else { player.position.y = floorLevel; vVel = 0; }
 
-            // 2. Powerup Timers & UI
-            let activePower = false;
-            if(magnetTimer > 0) { magnetTimer -= 0.016; activePower = true; }
-            if(hoverTimer > 0) { hoverTimer -= 0.016; activePower = true; camera.position.y = THREE.MathUtils.lerp(camera.position.y, 12, 0.1); } 
-            else { camera.position.y = THREE.MathUtils.lerp(camera.position.y, 7, 0.1); }
-            
-            const pb = document.getElementById('powerup-bar');
-            pb.style.display = activePower ? 'block' : 'none';
-            if(magnetTimer > 0) pb.innerHTML = "🧲 MAGNET ACTIVE";
-            if(hoverTimer > 0) pb.innerHTML = "🚀 HOVER BOOST ACTIVE";
+            if(magnetTimer > 0) magnetTimer -= 0.016;
+            if(hoverTimer > 0) { hoverTimer -= 0.016; camera.position.y = THREE.MathUtils.lerp(camera.position.y, 12, 0.1); } 
+            else camera.position.y = THREE.MathUtils.lerp(camera.position.y, 7, 0.1);
 
-            // 3. Cop Logic 
             let targetZ = stumbled ? 4 : 20;
             cop.position.z = THREE.MathUtils.lerp(cop.position.z, targetZ, 0.05);
             cop.position.x = player.position.x;
-            if(stumbled) {
-                sTimer -= 0.016;
-                if(sTimer <= 0) { stumbled = false; document.getElementById('warning').style.display = 'none'; }
-            }
-
-            // 4. Object Moving & Collisions
-            let hitBoxY = isSliding ? 1.0 : 2.5;
 
             trains.forEach(t => {
                 t.position.z += speed;
@@ -267,45 +194,23 @@
                 if(Math.abs(t.position.z - player.position.z) < 6 && Math.abs(t.position.x - player.position.x) < 1.5 && player.position.y < 3) endGame();
             });
 
-            barriers.forEach(b => {
-                b.position.z += speed;
-                if(b.position.z > 20) { b.position.z = -100 - Math.random()*50; b.position.x = LANES[Math.floor(Math.random()*3)]; }
-                
-                let isHit = false;
-                if(Math.abs(b.position.z - player.position.z) < 1 && Math.abs(b.position.x - player.position.x) < 1.2) {
-                    if(b.isSlide && player.position.y + hitBoxY > 2.2 && !isSliding) isHit = true; 
-                    if(!b.isSlide && player.position.y < 1.5) isHit = true; 
-                }
-
-                if(isHit && hoverTimer <= 0) {
-                    if(!stumbled) { stumbled = true; sTimer = 4; b.position.z = -100; document.getElementById('warning').style.display = 'block'; }
-                    else endGame();
-                }
-            });
-
             coinsArr.forEach(c => {
-                c.position.z += speed; c.rotation.y += 0.1;
-                
+                c.position.z += speed;
                 if(magnetTimer > 0 && c.position.z > player.position.z - 5 && c.position.z < player.position.z + 30) {
                     c.position.x = THREE.MathUtils.lerp(c.position.x, player.position.x, 0.1);
                     c.position.y = THREE.MathUtils.lerp(c.position.y, player.position.y + 1, 0.1);
                 }
-
-                if(c.position.z > 20) { c.position.z = -50 - Math.random()*50; c.position.x = LANES[Math.floor(Math.random()*3)]; c.position.y = 1; }
-                if(Math.abs(c.position.z - player.position.z) < 1.5 && Math.abs(c.position.x - player.position.x) < 1.5 && Math.abs(c.position.y - player.position.y) < 2) {
+                if(c.position.z > 20) { c.position.z = -50 - Math.random()*50; c.position.x = LANES[Math.floor(Math.random()*3)]; }
+                if(Math.abs(c.position.z - player.position.z) < 1.5 && Math.abs(c.position.x - player.position.x) < 1.5) {
                     coins++; c.position.z = -100; document.getElementById('c-count').innerText = coins;
                 }
             });
 
             powerups.forEach(p => {
                 p.position.z += speed;
-                // Add a gentle floating bounce to the icons
-                p.position.y = 1.5 + Math.sin(d * 0.005 + p.pType) * 0.2; 
-
                 if(p.position.z > 20) { p.position.z = -300 - Math.random()*200; p.position.x = LANES[Math.floor(Math.random()*3)]; }
                 if(Math.abs(p.position.z - player.position.z) < 1.5 && Math.abs(p.position.x - player.position.x) < 1.5) {
-                    if(p.pType === 0) magnetTimer = 8; 
-                    if(p.pType === 1) { hoverTimer = 8; vVel = 0.5; } 
+                    if(p.pType === 0) magnetTimer = 8; else { hoverTimer = 8; vVel = 0.5; }
                     p.position.z = -300;
                 }
             });
@@ -315,7 +220,6 @@
 
         function startGame() { active = true; document.getElementById('menu').classList.add('hidden'); document.getElementById('hud').classList.remove('hidden'); }
         function endGame() { active = false; document.getElementById('over').classList.remove('hidden'); document.getElementById('f-score').innerText = score; }
-
         function animate() { requestAnimationFrame(animate); update(); renderer.render(scene, camera); }
         animate();
     </script>
